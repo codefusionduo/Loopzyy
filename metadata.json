@@ -1,0 +1,9 @@
+{
+  "name": "Loopzyy",
+  "description": "A next-generation social media experience powered by Gemini AI, featuring smart content enhancement and instant engagement tools.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
