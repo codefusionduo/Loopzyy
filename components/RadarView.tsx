@@ -4,6 +4,7 @@ import { User } from '../types';
 import { Radio, Coffee, Zap, Moon, Ghost, Navigation, MapPin, Hand, X, Loader2, AlertTriangle, Send, CheckCircle2, Clock, Users, Lock, Share } from 'lucide-react';
 import { Button } from './Button';
 import { activateRadar, deactivateRadar, scanForFriends, broadcastCheckIn } from '../services/radarService';
+import { checkLocationPermission, requestLocationPermission, type PermissionStatus, type LocationCoordinates } from '../services/locationService';
 
 interface RadarViewProps {
   currentUser: User;
@@ -24,6 +25,9 @@ export const RadarView: React.FC<RadarViewProps> = ({ currentUser }) => {
   const [detectedFriend, setDetectedFriend] = useState<User | null>(null);
   const [distance, setDistance] = useState<string>('');
   const [permissionError, setPermissionError] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('prompt');
+  const [userLocation, setUserLocation] = useState<LocationCoordinates | null>(null);
+  const [locationError, setLocationError] = useState<string>('');
   
   // New State for Meet Request Flow
   const [meetStatus, setMeetStatus] = useState<'idle' | 'sending' | 'waiting' | 'accepted' | 'rejected'>('idle');
@@ -38,30 +42,50 @@ export const RadarView: React.FC<RadarViewProps> = ({ currentUser }) => {
       verified: true
   };
 
+  // Check location permission on component mount
+  useEffect(() => {
+    const checkPermission = async () => {
+      try {
+        const status = await checkLocationPermission();
+        setPermissionStatus(status);
+      } catch (error) {
+        console.error('Error checking permission:', error);
+        setPermissionStatus('prompt');
+      }
+    };
+    
+    checkPermission();
+  }, []);
+
   const handleActivate = async () => {
     setPermissionError(false);
-    // 1. Request Permission
-    if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(async (position) => {
-            setIsActive(true);
-            setStatus('scanning');
-            setMeetStatus('idle'); // Reset meet status
-            await activateRadar(currentUser.id, mood, 60, visibility); // 60 mins default
-            
-            // 2. Simulate Scanning
-            const result = await scanForFriends(currentUser.id);
-            if (result.found) {
-                setTimeout(() => {
-                    setDetectedFriend(loopzyyBot);
-                    setStatus('detected');
-                }, 2000);
-            }
-        }, (error) => {
-            console.error("Geolocation error:", error);
-            setPermissionError(true);
-        });
-    } else {
-        alert("Geolocation is not supported by this browser.");
+    setLocationError('');
+    
+    try {
+      // Request location permission
+      const location = await requestLocationPermission();
+      setUserLocation(location);
+      setPermissionStatus('granted');
+      
+      // Activate radar with location
+      setIsActive(true);
+      setStatus('scanning');
+      setMeetStatus('idle');
+      await activateRadar(currentUser.id, mood, 60, visibility, location);
+      
+      // Simulate scanning for friends
+      const result = await scanForFriends(currentUser.id);
+      if (result.found) {
+        setTimeout(() => {
+          setDetectedFriend(loopzyyBot);
+          setStatus('detected');
+        }, 2000);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get location';
+      setLocationError(errorMessage);
+      setPermissionError(true);
+      console.error('Location permission error:', error);
     }
   };
 
@@ -202,15 +226,22 @@ export const RadarView: React.FC<RadarViewProps> = ({ currentUser }) => {
                                 <AlertTriangle className="w-6 h-6 text-red-400" />
                             </div>
                             <p className="text-red-400 text-sm mb-3">
-                                Radar requires location permissions to work! It's a proximity feature.
+                                {locationError || 'Radar requires location permissions to work! It\'s a proximity feature.'}
                             </p>
-                            <Button 
-                                onClick={handleActivate} 
-                                variant="secondary" 
-                                className="h-9 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-200 border-transparent w-full"
-                            >
-                                Retry Permission
-                            </Button>
+                            <div className="space-y-2">
+                              <Button 
+                                  onClick={handleActivate} 
+                                  variant="secondary" 
+                                  className="h-9 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-200 border-transparent w-full"
+                              >
+                                  Retry Permission
+                              </Button>
+                              {permissionStatus === 'denied' && (
+                                <p className="text-xs text-red-300 mt-2">
+                                  Location is blocked. Please enable it in your browser settings and refresh.
+                                </p>
+                              )}
+                            </div>
                         </div>
                     )}
 
@@ -239,9 +270,7 @@ export const RadarView: React.FC<RadarViewProps> = ({ currentUser }) => {
                         <div className="absolute inset-0 border border-brand-500/20 rounded-full opacity-20" />
                         
                         {/* Scanning Beam */}
-                        <div className="absolute inset-0 rounded-full animate-spin [animation-duration:4s] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(139,92,246,0.1)_300deg,rgba(139,92,246,0.5)_360deg)]" 
-                             style={{ maskImage: 'radial-gradient(circle, transparent 30%, black 100%)' }}
-                        />
+                        <div className="absolute inset-0 rounded-full animate-spin [animation-duration:4s] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(139,92,246,0.1)_300deg,rgba(139,92,246,0.5)_360deg)] radar-scanning-beam" />
 
                         {/* User Center */}
                         <div className="absolute w-20 h-20 bg-black rounded-full border-4 border-zinc-800 z-20 flex items-center justify-center shadow-2xl">

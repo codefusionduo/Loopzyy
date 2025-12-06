@@ -1,0 +1,5 @@
+/* Radar Scanning Beam Animation */
+.radar-scanning-beam {
+  -webkit-mask-image: radial-gradient(circle, transparent 30%, black 100%);
+  mask-image: radial-gradient(circle, transparent 30%, black 100%);
+}

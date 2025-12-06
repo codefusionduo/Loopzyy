@@ -1,8 +1,15 @@
 
 import { db } from "../firebase";
 import { doc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import type { LocationCoordinates } from "./locationService";
 
-export const activateRadar = async (userId: string, mood: string, durationMinutes: number, visibility: 'all' | 'close' = 'all') => {
+export const activateRadar = async (
+  userId: string,
+  mood: string,
+  durationMinutes: number,
+  visibility: 'all' | 'close' = 'all',
+  location?: LocationCoordinates
+) => {
   try {
     const radarRef = doc(db, "radar_sessions", userId);
     await setDoc(radarRef, {
@@ -12,7 +19,12 @@ export const activateRadar = async (userId: string, mood: string, durationMinute
       isActive: true,
       startTime: serverTimestamp(),
       expiresAt: Date.now() + (durationMinutes * 60 * 1000),
-      lastLocation: null // We don't store real location for the demo, just presence
+      lastLocation: location ? {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+        timestamp: serverTimestamp()
+      } : null
     }, { merge: true });
     
     return true;
