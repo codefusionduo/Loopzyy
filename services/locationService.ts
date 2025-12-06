@@ -33,7 +33,7 @@ export const checkLocationPermission = async (): Promise<PermissionStatus> => {
 };
 
 /**
- * Request location permission and get current position
+ * Request location permission and get current position with retry logic
  */
 export const requestLocationPermission = (): Promise<LocationCoordinates> => {
   return new Promise((resolve, reject) => {
@@ -42,6 +42,7 @@ export const requestLocationPermission = (): Promise<LocationCoordinates> => {
       return;
     }
 
+    // First attempt with high accuracy
     navigator.geolocation.getCurrentPosition(
       (position) => {
         resolve({
@@ -51,25 +52,61 @@ export const requestLocationPermission = (): Promise<LocationCoordinates> => {
         });
       },
       (error) => {
-        let errorMessage = 'Location permission denied';
+        // If high accuracy fails, retry with lower accuracy
+        if (error.code === error.POSITION_UNAVAILABLE) {
+          console.warn('High accuracy location unavailable, retrying with lower accuracy...');
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              resolve({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+              });
+            },
+            (retryError) => {
+              let errorMessage = 'Location permission denied';
 
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location permission denied. Please enable it in your browser settings.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information is unavailable.';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Location request timed out.';
-            break;
+              switch (retryError.code) {
+                case retryError.PERMISSION_DENIED:
+                  errorMessage = 'Location permission denied. Please enable it in your browser settings.';
+                  break;
+                case retryError.POSITION_UNAVAILABLE:
+                  errorMessage = 'Location information is unavailable. Please enable location services or try again.';
+                  break;
+                case retryError.TIMEOUT:
+                  errorMessage = 'Location request timed out. Please check your connection.';
+                  break;
+              }
+
+              reject(new Error(errorMessage));
+            },
+            {
+              enableHighAccuracy: false, // Lower accuracy for retry
+              timeout: 15000,
+              maximumAge: 60000, // Allow cached location up to 1 minute
+            }
+          );
+        } else {
+          let errorMessage = 'Location permission denied';
+
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Location permission denied. Please enable it in your browser settings.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Location information is unavailable.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Location request timed out. Please check your connection.';
+              break;
+          }
+
+          reject(new Error(errorMessage));
         }
-
-        reject(new Error(errorMessage));
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 8000,
         maximumAge: 0,
       }
     );
@@ -151,3 +188,25 @@ export const calculateDistance = (
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
+
+/**
+ * Get approximate location based on IP address (fallback)
+ * Returns a promise that resolves with approximate coordinates
+ */
+export const getApproximateLocationByIP = async (): Promise<LocationCoordinates> => {
+  try {
+    const response = await fetch('https://ipapi.co/json/');
+    if (!response.ok) throw new Error('IP geolocation failed');
+    
+    const data = await response.json();
+    return {
+      latitude: data.latitude,
+      longitude: data.longitude,
+      accuracy: 5000, // ~5km accuracy for IP-based location
+    };
+  } catch (error) {
+    console.warn('IP-based geolocation failed:', error);
+    throw new Error('Could not determine location. Please check your internet connection or enable location services.');
+  }
+};
+

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <defs>
+    <style>
+      .logo-bg { fill: #2563eb; }
+      .logo-icon { stroke: white; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    </style>
+  </defs>
+  <rect width="24" height="24" class="logo-bg" rx="4"/>
+  <path 
+    d="M12 12C10 9.33 7 8 5 8C2.79 8 1 9.79 1 12C1 14.21 2.79 16 5 16C7 16 10 14.67 12 12ZM12 12C14 14.67 17 16 19 16C21.21 16 23 14.21 23 12C23 9.79 21.21 8 19 8C17 8 14 9.33 12 12Z"
+    class="logo-icon"
+  />
+</svg>

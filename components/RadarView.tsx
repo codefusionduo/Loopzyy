@@ -4,7 +4,7 @@ import { User } from '../types';
 import { Radio, Coffee, Zap, Moon, Ghost, Navigation, MapPin, Hand, X, Loader2, AlertTriangle, Send, CheckCircle2, Clock, Users, Lock, Share } from 'lucide-react';
 import { Button } from './Button';
 import { activateRadar, deactivateRadar, scanForFriends, broadcastCheckIn } from '../services/radarService';
-import { checkLocationPermission, requestLocationPermission, type PermissionStatus, type LocationCoordinates } from '../services/locationService';
+import { checkLocationPermission, requestLocationPermission, getApproximateLocationByIP, type PermissionStatus, type LocationCoordinates } from '../services/locationService';
 
 interface RadarViewProps {
   currentUser: User;
@@ -62,10 +62,19 @@ export const RadarView: React.FC<RadarViewProps> = ({ currentUser }) => {
     setLocationError('');
     
     try {
-      // Request location permission
-      const location = await requestLocationPermission();
+      // Try to get location with native geolocation
+      let location: LocationCoordinates;
+      try {
+        location = await requestLocationPermission();
+        setPermissionStatus('granted');
+      } catch (nativeError) {
+        // Fallback to IP-based geolocation
+        console.warn('Native geolocation failed, using IP-based location:', nativeError);
+        location = await getApproximateLocationByIP();
+        setLocationError('Using approximate location based on IP address.');
+      }
+      
       setUserLocation(location);
-      setPermissionStatus('granted');
       
       // Activate radar with location
       setIsActive(true);
